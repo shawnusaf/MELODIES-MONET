@@ -5,8 +5,8 @@
 # Initially copied from surfplots and altered to use xarray syntax instead of pandas
 # Renamed xarrayplots 10/2024 
 
-import os
-import monetio as mio
+import logging
+
 import monet as monet
 import seaborn as sns
 
@@ -16,56 +16,20 @@ import numpy as np
 import cartopy.crs as ccrs
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from numpy import corrcoef
-sns.set_context('paper')
+
 from monet.plots.taylordiagram import TaylorDiagram as td
-from matplotlib.colors import ListedColormap
 from monet.util.tools import get_epa_region_bounds as get_epa_bounds 
+from monet.util.tools import get_giorgi_region_bounds as get_giorgi_bounds
 import math
 from ..plots import savefig
 
+plt.set_loglevel(level="warning")
+logging.getLogger("PIL").setLevel(logging.WARNING)
 
-def map_projection(f):
-    """Defines map projection. This needs updating to make it more generic.
+sns.set_context('paper')
+
     
-    Parameters
-    ----------
-    f : class
-        model class
-        
-    Returns
-    -------
-    cartopy projection 
-        projection to be used by cartopy in plotting
-        
-    """
-    import cartopy.crs as ccrs
-    if f.model.lower() == 'cmaq':
-        proj = ccrs.LambertConformal(
-            central_longitude=f.obj.XCENT, central_latitude=f.obj.YCENT)
-    elif f.model.lower() == 'wrfchem' or f.model.lower() == 'rapchem':
-        if f.obj.MAP_PROJ == 1:
-            proj = ccrs.LambertConformal(
-                central_longitude=f.obj.CEN_LON, central_latitude=f.obj.CEN_LAT)
-        elif f.MAP_PROJ == 6:
-            #Plate Carree is the equirectangular or equidistant cylindrical
-            proj = ccrs.PlateCarree(
-                central_longitude=f.obj.CEN_LON)
-        else:
-            raise NotImplementedError('WRFChem projection not supported. Please add to surfplots.py')         
-    #Need to add the projections you want to use for the other models here.        
-    elif f.model.lower() == 'rrfs':
-        proj = ccrs.LambertConformal(
-            central_longitude=f.obj.cen_lon, central_latitude=f.obj.cen_lat)
-    elif f.model.lower() in ['cesm_fv','cesm_se','raqms']:
-        proj = ccrs.PlateCarree()
-    elif f.model.lower() == 'random':
-        proj = ccrs.PlateCarree()
-    else: #Let's change this tomorrow to just plot as lambert conformal if nothing provided.
-        raise NotImplementedError('Projection not defined for new model. Please add to surfplots.py')
-    return proj
-    
-def make_timeseries(dset, df_reg=None,column=None, label=None, ax=None, avg_window=None, ylabel=None,
+def make_timeseries(dset, varname=None, label=None, ax=None, avg_window=None, ylabel=None,
                     vmin = None, vmax = None,
                     domain_type=None, domain_name=None,
                     plot_dict=None, fig_dict=None, text_dict=None,debug=False):
@@ -73,12 +37,10 @@ def make_timeseries(dset, df_reg=None,column=None, label=None, ax=None, avg_wind
     
     Parameters
     ----------
-    df : dataframe
+    dset : xr.Dataset
         model/obs pair data to plot
-    column : str
-        Column label of variable to plot
-    df_reg: not currently enabled. empty argument for symmetry with surfplots
-        model/obs paired regulatory data to plot
+    varname : str
+        Variable label of variable to plot
     label : str
         Name of variable to use in plot legend 
     ax : ax
@@ -125,7 +87,7 @@ def make_timeseries(dset, df_reg=None,column=None, label=None, ax=None, avg_wind
         text_kwargs = def_text
     # set ylabel to column if not specified.
     if ylabel is None:
-        ylabel = column
+        ylabel = varname
     if label is not None:
         plot_dict['label'] = label
     if vmin is not None and vmax is not None:
@@ -147,19 +109,16 @@ def make_timeseries(dset, df_reg=None,column=None, label=None, ax=None, avg_wind
             f,ax = plt.subplots(**fig_dict)    
         else: 
             f,ax = plt.subplots(figsize=(10,6))
+
         # plot the line
-        print(plot_kwargs)
-        # {'color': 'k', 'linestyle': '-', 'marker': '*', 'linewidth': 2.0, 'markersize': 10.0, 'label': 'omps_nm', 'fontsize': 14.4}
         if avg_window is None:
             # bug fixed (AttributeError: 'Rectangle' object has no property 'marker'). M.Li
-            df[column].mean('y').plot.line(x = "time", ax=ax, color=plot_kwargs['color'],linestyle=plot_kwargs['linestyle'],\
-            #df[column].mean('y').plot(ax=ax, color=plot_kwargs['color'],linestyle=plot_kwargs['linestyle'],\
+            dset[varname].mean(dim=('y','x',skipna=True)).plot.line(x = "time", ax=ax, color=plot_kwargs['color'],linestyle=plot_kwargs['linestyle'],\
                                            marker=plot_kwargs['marker'],linewidth=plot_kwargs['linewidth'],\
                                           markersize=plot_kwargs['markersize'],label=plot_kwargs['label'])
         else:
             # bug fixed (AttributeError: 'Rectangle' object has no property 'marker'). M.Li
-            df[column].resample(time = avg_window).mean().mean('y').plot.line(x = "time", ax=ax,color=plot_kwargs['color'],\
-            #df[column].resample(time = avg_window).mean().mean('y').plot(ax=ax,color=plot_kwargs['color'],\
+            dset[varname].resample(time = avg_window).mean().mean(dim=('y','x')).plot.line(x = "time", ax=ax,color=plot_kwargs['color'],\
                                                                               linestyle=plot_kwargs['linestyle'],\
                                            marker=plot_kwargs['marker'],linewidth=plot_kwargs['linewidth'],\
                                           markersize=plot_kwargs['markersize'],label=plot_kwargs['label'])
@@ -169,14 +128,12 @@ def make_timeseries(dset, df_reg=None,column=None, label=None, ax=None, avg_wind
         # this means that an axis handle already exists and use it to plot the model output.
         if avg_window is None:
             # bug fixed. M.Li
-            df[column].mean('y').plot.line(x = "time",ax=ax, color=plot_dict['color'],linestyle=plot_dict['linestyle'],\
-            #df[column].mean('y').plot(ax=ax, color=plot_dict['color'],linestyle=plot_dict['linestyle'],\
+            dset[varname].mean(dim=('y','x')).plot.line(x = "time",ax=ax, color=plot_dict['color'],linestyle=plot_dict['linestyle'],\
                                            marker=plot_dict['marker'],linewidth=plot_dict['linewidth'],\
                                           markersize=plot_dict['markersize'],label=plot_dict['label'])
         else:
             # bug fixed. M.Li
-            df[column].resample(time=avg_window).mean().mean('y').plot.line(x = "time",ax=ax, color=plot_dict['color'],\
-            #df[column].resample(time=avg_window).mean().mean('y').plot(ax=ax, color=plot_dict['color'],\
+            dset[varname].resample(time=avg_window).mean().mean(dim=('y','x')).plot.line(x = "time",ax=ax, color=plot_dict['color'],\
                                                                             linestyle=plot_dict['linestyle'],\
                                            marker=plot_dict['marker'],linewidth=plot_dict['linewidth'],\
                                           markersize=plot_dict['markersize'],label=plot_dict['label'])   
@@ -194,29 +151,6 @@ def make_timeseries(dset, df_reg=None,column=None, label=None, ax=None, avg_wind
             ax.set_title('EPA Region ' + domain_name,fontweight='bold',**text_kwargs)
         else:
             ax.set_title(domain_name,fontweight='bold',**text_kwargs)
-    return ax
-
-def make_zonalmean(ds,column_o=None,label_o='Obs',column_m=None,label_m='Model',ylabel=None,plot_dict=None,fig_dict=None,debug=False,text_dict=None):
-    """Creates zonal mean plot
-    Parameters
-
-    Return
-    """
-    if debug == False:
-        plt.ioff()
-        
-    #set default text size
-    def_text = dict(fontsize=14.0)
-    if text_dict is not None:
-        text_kwargs = {**def_text, **text_dict}
-    else:
-        text_kwargs = def_text
-    # set ylabel to column if not specified.
-    if ylabel is None:
-        ylabel = column_o
-        
-    zm_diff = (ds[column_o])
-    ax = zm_diff.groupby('latitude').mean().plot(vmin=0)
     return ax
 
 def make_taylor(df,df_reg=None, column_o=None, label_o='Obs', column_m=None, label_m='Model', 
