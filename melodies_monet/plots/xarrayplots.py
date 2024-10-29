@@ -20,7 +20,6 @@ import matplotlib.pyplot as plt
 from monet.plots.taylordiagram import TaylorDiagram as td
 from monet.util.tools import get_epa_region_bounds as get_epa_bounds 
 from monet.util.tools import get_giorgi_region_bounds as get_giorgi_bounds
-import math
 from ..plots import savefig
 
 plt.set_loglevel(level="warning")
@@ -405,15 +404,42 @@ def make_boxplot(comb_bx, label_bx, ylabel = None, vmin = None, vmax = None, out
     plt.tight_layout()
     savefig(outname + '.png',loc=4, logo_height=100, decorate=True, bbox_inches='tight', dpi=200)
     
-def make_spatial_bias_gridded(df, column_o=None, label_o=None, column_m=None, 
-                      label_m=None, ylabel = None, vmin=None,
-                      vmax = None, nlevels = None, proj = None, outname = 'plot', 
+def make_spatial_bias_gridded(dset, varname_o=None, label_o=None, varname_m=None, 
+                      label_m=None, cblabel = None, vdiff=None,
+                      nlevels = None, proj = None, outname = 'plot', 
                       domain_type=None, domain_name=None, fig_dict=None, 
                       text_dict=None,debug=False):
         
     """Creates difference plot for satellite and model data.
         For data in swath format, overplots all differences
         For data on regular grid, mean difference.
+
+        Parameters
+        ----------
+        dset : xr.Dataset
+            model/obs paired data to plot
+        varname_o : str
+            Name of observation variable to plot
+        label_o : str
+            Name of observation variable to use in plot title 
+        varname_m : str
+            Name of model variable to plot
+        label_m : str
+            Name of model variable to use in plot title
+        cblabel : str
+            Title of colorbar axis
+        vdiff : float
+            Min and max value to use on colorbar axis
+        nlevels : float
+            number of levels to break colorbar map into
+        proj : cartopy projection
+            cartopy projection to use in plot
+
+        Returns
+        -------
+        plot
+            satellite spatial bias plot
+        
     """
     if debug == False:
         plt.ioff()
@@ -431,13 +457,13 @@ def make_spatial_bias_gridded(df, column_o=None, label_o=None, column_m=None,
     else:
         text_kwargs = def_text
         
-    # set ylabel to column if not specified.
-    if ylabel is None:
-        ylabel = column_o
+    # set colorbar label to column if not specified.
+    if cblabel is None:
+        cblabel = varname_o
     
     #Take the difference for the model output - the sat output
 
-    diff_mod_min_obs = (df[column_m] - df[column_o]).squeeze()
+    diff_mod_min_obs = (dset[varname_m] - dset[varname_o]).squeeze()
     #Take mean over time, 
     if len(diff_mod_min_obs.dims) == 3:
         diff_mod_min_obs = diff_mod_min_obs.mean('time')
@@ -469,16 +495,16 @@ def make_spatial_bias_gridded(df, column_o=None, label_o=None, column_m=None,
         map_kwargs['crs'] = proj
     
     #First determine colorbar
-    if vmin == None and vmax == None:
+    if vdiff == None:
         #vmin = vmodel_mean.quantile(0.01)
-        vmax = np.max((np.abs(diff_mod_min_obs.quantile(0.99)),np.abs(diff_mod_min_obs.quantile(0.01))))
-        vmin = -vmax
+        vdiff = np.max((np.abs(diff_mod_min_obs.quantile(0.99)),np.abs(diff_mod_min_obs.quantile(0.01))))
+        #vmin = -vmax
         
     if nlevels == None:
         nlevels = 21
-    print(vmin,vmax)
-    clevel = np.linspace(vmin,vmax,nlevels)
-    cmap = mpl.cm.get_cmap('bwr',nlevels-1) 
+    
+    clevel = np.linspace(-vdiff,vdiff,nlevels)
+    cmap = mpl.cm.get_cmap('RdBu_r',nlevels-1) 
     norm = mpl.colors.BoundaryNorm(clevel, ncolors=cmap.N, clip=False)
         
     #I add extend='both' here because the colorbar is setup to plot the values outside the range
@@ -490,9 +516,6 @@ def make_spatial_bias_gridded(df, column_o=None, label_o=None, column_m=None,
     plt.title(title_add + label_m + ' - ' + label_o,fontweight='bold',**text_kwargs)
     ax.axes.set_extent(map_kwargs['extent'],crs=ccrs.PlateCarree())    
     
-    #Uncomment these lines if you update above just to verify colorbars are identical.
-    #Also specify plot above scatter = ax.axes.scatter etc.
-    #cbar = ax.figure.get_axes()[1] 
     plt.colorbar(c,ax=ax,extend='both')
     
     #Update colorbar
@@ -505,7 +528,7 @@ def make_spatial_bias_gridded(df, column_o=None, label_o=None, column_m=None,
     position_m = model_ax.get_position()
     position_c = cax.get_position()
     cax.set_position([position_c.x0, position_m.y0, position_c.x1 - position_c.x0, (position_m.y1-position_m.y0)*1.1])
-    cax.set_ylabel('$\Delta$'+ylabel,fontweight='bold',**text_kwargs)
+    cax.set_ylabel('$\Delta$'+cblabel,fontweight='bold',**text_kwargs)
     cax.tick_params(labelsize=text_kwargs['fontsize']*0.8,length=10.0,width=2.0,grid_linewidth=2.0)    
     
     #plt.tight_layout(pad=0)
