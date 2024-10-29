@@ -153,7 +153,7 @@ def make_timeseries(dset, varname=None, label=None, ax=None, avg_window=None, yl
             ax.set_title(domain_name,fontweight='bold',**text_kwargs)
     return ax
 
-def make_taylor(df,df_reg=None, column_o=None, label_o='Obs', column_m=None, label_m='Model', 
+def make_taylor(dset, varname_o=None, label_o='Obs', varname_m=None, label_m='Model', 
                 dia=None, ylabel=None, ty_scale=1.5,
                 domain_type=None, domain_name=None,
                 plot_dict=None, fig_dict=None, text_dict=None,debug=False):
@@ -162,16 +162,14 @@ def make_taylor(df,df_reg=None, column_o=None, label_o='Obs', column_m=None, lab
     
     Parameters
     ----------
-    df : dataframe
+    dset : xr.Dataset
         model/obs pair data to plot
-    df_reg: not currently enabled. empty argument for symmetry with surfplots
-        model/obs paired regulatory data to plot
-    column_o : str
-        Column label of observational variable to plot
+    varname_o : str
+        variable name label of observational variable to plot
     label_o : str
         Name of observational variable to use in plot legend
-    column_m : str
-        Column label of model variable to plot
+    varname_m : str
+        variable name label of model variable to plot
     label_m : str
         Name of model variable to use in plot legend 
     dia : dia
@@ -202,7 +200,7 @@ def make_taylor(df,df_reg=None, column_o=None, label_o='Obs', column_m=None, lab
         Taylor diagram class defined in MONET
         
     """
-    nan_ind = ((~np.isnan(df[column_o].values))&(~np.isnan(df[column_m].values)))
+
     #First define items for all plots
     if debug == False:
         plt.ioff()
@@ -215,7 +213,7 @@ def make_taylor(df,df_reg=None, column_o=None, label_o='Obs', column_m=None, lab
         text_kwargs = def_text
     # set ylabel to column if not specified.
     if ylabel is None:
-        ylabel = column_o
+        ylabel = varname_o
     #Then, if no plot has been created yet, create a plot and plot the first pair.
     if dia is None: 
         # create the figure
@@ -225,16 +223,16 @@ def make_taylor(df,df_reg=None, column_o=None, label_o='Obs', column_m=None, lab
             f = plt.figure(figsize=(12,10))    
         sns.set_style('ticks')
         # plot the line
-        dia = td(df[column_o].std().values, scale=ty_scale, fig=f,
+        dia = td(dset[varname_o].std().to_numpy(), scale=ty_scale, fig=f,
                                rect=111, label=label_o)
         plt.grid(linewidth=1, alpha=.5)
-        cc = corrcoef(df[column_o].values[nan_ind].flatten(), df[column_m].values[nan_ind].flatten())[0, 1]
-        dia.add_sample(df[column_m].std().values, cc, zorder=9, label=label_m, **plot_dict)
+        cc = xr.corr(dset[varname_o].stack(tempdim=[...]).dropna(dim='tempdim'),dset[varanme_m].stack(tempdim=[...]).dropna(dim='tempdim'))
+        dia.add_sample(dset[varname_m].std().to_numpy(), cc, zorder=9, label=label_m, **plot_dict)
     # If plot has been created add to the current axes.
     else:
         # this means that an axis handle already exists and use it to plot another model
-        cc = corrcoef(df[column_o].values[nan_ind].flatten(), df[column_m].values[nan_ind].flatten())[0, 1]
-        dia.add_sample(df[column_m].std().values, cc, zorder=9, label=label_m, **plot_dict)
+        cc = xr.corr(dset[varname_o].stack(tempdim=[...]).dropna(dim='tempdim'),dset[varanme_m].stack(tempdim=[...]).dropna(dim='tempdim'))
+        dia.add_sample(dset[varname_m].std().to_numpy(), cc, zorder=9, label=label_m, **plot_dict)
     #Set parameters for all plots
     contours = dia.add_contours(colors='0.5')
     # control the clabel format for very high values (e.g., NO2 columns), M.Li
