@@ -1,14 +1,15 @@
 # Copyright (C) 2022 National Center for Atmospheric Research and National Oceanic and Atmospheric Administration
 # SPDX-License-Identifier: Apache-2.0
 #
-#Code to create plots for satellite observations
-# Copied from surfplots and altered to use xarray syntax instead of pandas
+# Code to create plots for satellite observations
+# Initially copied from surfplots and altered to use xarray syntax instead of pandas
+# Renamed xarrayplots 10/2024 
 
 import os
 import monetio as mio
 import monet as monet
 import seaborn as sns
-from monet.util.tools import calc_8hr_rolling_max, calc_24hr_ave
+
 import xarray as xr
 import pandas as pd
 import numpy as np
@@ -23,79 +24,6 @@ from monet.util.tools import get_epa_region_bounds as get_epa_bounds
 import math
 from ..plots import savefig
 
-def make_24hr_regulatory(df, col=None):
-    """Calculates 24-hour averages
-    
-    Parameters
-    ----------
-    df : dataframe
-        Model/obs pair of hourly data
-    col : str
-        Column label of observation variable to apply the calculation 
-    Returns
-    -------
-    dataframe
-        dataframe with applied calculation
-        
-    """
-    return calc_24hr_ave(df, col)
-
-
-def make_8hr_regulatory(df, col=None):
-    """Calculates 8-hour rolling average daily
-    
-    Parameters
-    ----------
-    df : dataframe
-        Model/obs pair of hourly data
-    col : str
-        Column label of observation variable to apply the calculation 
-    Returns
-    -------
-    dataframe
-        dataframe with applied calculation
-        
-    """
-    return calc_8hr_rolling_max(df, col, window=8)
-
-def calc_default_colors(p_index):
-    """List of default colors, lines, and markers to use if user does not 
-    specify them in the input yaml file.
-    
-    Parameters
-    ----------
-    p_index : integer
-        Number of pairs in analysis class
-    
-    Returns
-    -------
-    list
-        List of dictionaries containing default colors, lines, and 
-        markers to use for plotting for the number of pairs in analysis class
-        
-    """
-    x = [dict(color='b', linestyle='--',marker='x'),
-         dict(color='g', linestyle='-.',marker='o'),
-         dict(color='r', linestyle=':',marker='v'),
-         dict(color='c', linestyle='--',marker='^'),
-         dict(color='m', linestyle='-.',marker='s')]
-    #Repeat these 5 instances over and over if more than 5 lines.
-    return x[p_index % 5]
-
-def new_color_map():
-    """Creates new color map for difference plots
-    
-    Returns
-    -------
-    colormap
-        Orange and blue color map
-        
-    """
-    top = mpl.cm.get_cmap('Blues_r', 128)
-    bottom = mpl.cm.get_cmap('Oranges', 128)
-    newcolors = np.vstack((top(np.linspace(0, 1, 128)),
-                           bottom(np.linspace(0, 1, 128))))
-    return ListedColormap(newcolors, name='OrangeBlue')
 
 def map_projection(f):
     """Defines map projection. This needs updating to make it more generic.
@@ -137,7 +65,7 @@ def map_projection(f):
         raise NotImplementedError('Projection not defined for new model. Please add to surfplots.py')
     return proj
     
-def make_timeseries(df, df_reg=None,column=None, label=None, ax=None, avg_window=None, ylabel=None,
+def make_timeseries(dset, df_reg=None,column=None, label=None, ax=None, avg_window=None, ylabel=None,
                     vmin = None, vmax = None,
                     domain_type=None, domain_name=None,
                     plot_dict=None, fig_dict=None, text_dict=None,debug=False):
@@ -267,7 +195,30 @@ def make_timeseries(df, df_reg=None,column=None, label=None, ax=None, avg_window
         else:
             ax.set_title(domain_name,fontweight='bold',**text_kwargs)
     return ax
-    
+
+def make_zonalmean(ds,column_o=None,label_o='Obs',column_m=None,label_m='Model',ylabel=None,plot_dict=None,fig_dict=None,debug=False,text_dict=None):
+    """Creates zonal mean plot
+    Parameters
+
+    Return
+    """
+    if debug == False:
+        plt.ioff()
+        
+    #set default text size
+    def_text = dict(fontsize=14.0)
+    if text_dict is not None:
+        text_kwargs = {**def_text, **text_dict}
+    else:
+        text_kwargs = def_text
+    # set ylabel to column if not specified.
+    if ylabel is None:
+        ylabel = column_o
+        
+    zm_diff = (ds[column_o])
+    ax = zm_diff.groupby('latitude').mean().plot(vmin=0)
+    return ax
+
 def make_taylor(df,df_reg=None, column_o=None, label_o='Obs', column_m=None, label_m='Model', 
                 dia=None, ylabel=None, ty_scale=1.5,
                 domain_type=None, domain_name=None,
