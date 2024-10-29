@@ -279,9 +279,7 @@ class observation:
                 # additional development to deal with files crossing intervals needed (eg situtations where orbit start at 23hrs, ends next day).
                 if time_interval is not None:
                     self.obj = self.obj.sel(time=slice(time_interval[0],time_interval[-1]))
-            elif self.sat_type == 'omps_lp_o3':
-                print('Reading OMPS LP')
-                self.obj = mio.sat._omps_lp_mm.read_omps_lp_o3(self.file)
+
             elif self.sat_type == 'mopitt_l3':
                 print('Reading MOPITT')
                 if time_interval is not None:
