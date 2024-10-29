@@ -279,7 +279,9 @@ class observation:
                 # additional development to deal with files crossing intervals needed (eg situtations where orbit start at 23hrs, ends next day).
                 if time_interval is not None:
                     self.obj = self.obj.sel(time=slice(time_interval[0],time_interval[-1]))
-
+            elif self.sat_type == 'omps_lp_o3':
+                print('Reading OMPS LP')
+                self.obj = mio.sat._omps_lp_mm.read_omps_lp_o3(self.file)
             elif self.sat_type == 'mopitt_l3':
                 print('Reading MOPITT')
                 if time_interval is not None:
@@ -1446,12 +1448,10 @@ class analysis:
         
         from .util.tools import resample_stratify, get_epa_region_bounds, get_giorgi_region_bounds
         import matplotlib.pyplot as plt
-        pair_keys = list(self.paired.keys())
-        if self.paired[pair_keys[0]].type.lower() in ['sat_grid_clm','sat_swath_clm']:
-            from .plots import satplots as splots,savefig
-        else: 
-            from .plots import surfplots as splots, savefig
-            from .plots import aircraftplots as airplots
+
+        from .plots import surfplots as splots, savefig
+        from .plots import aircraftplots as airplots
+        from .plots import xarrayplots as xrplots
 
         # Disable figure count warning
         initial_max_fig = plt.rcParams["figure.max_open_warning"]
@@ -1541,11 +1541,7 @@ class analysis:
                             if 'time' not in p.obj.dims and obs_type == 'sat_swath_clm':
                                 
                                 pairdf_all = p.obj.swap_dims({'x':'time'})
-                            # squash lat/lon dimensions into single dimension
-                            ## 2024-03 MEB rechecking necessity of this.
-                            #elif obs_type == 'sat_grid_clm':
-                            #    pairdf_all = p.obj.stack(ll=['x','y'])
-                            #    pairdf_all = pairdf_all.rename_dims({'ll':'y'})
+
                             else:
                                 pairdf_all = p.obj
                             # Select only the analysis time window.
@@ -1691,7 +1687,8 @@ class analysis:
                                                                         "sat_grid_sfc", "sat_grid_clm", 
                                                                         "sat_swath_prof"]: 
                             # xarray doesn't need nan drop because its math operations seem to ignore nans
-                            pairdf = pairdf_all
+                            # MEB (10/9/24): Add statement to ensure model and obs variables have nans at the same place
+                            pairdf = pairdf_all.where(~np.isnan(pairdf_all[obsvar]),np.nan)
 
                         else:
                             print('Warning: set rem_obs_nan = True for regulatory metrics') 
@@ -1874,9 +1871,6 @@ class analysis:
                                   ##  ax = airplots.add_yax2_altitude(ax, pairdf, altitude_variable, altitude_ticks, text_kwargs)
                                 ##savefig(outname + '.png', logo_height=150)
                                 ##del (ax, fig_dict, plot_dict, text_dict, obs_dict, obs_plot_dict) #Clear axis for next plot.
-                        
-
-
 
                         elif plot_type.lower() == 'curtain':
                             # Set cmin and cmax from obs_plot_dict for colorbar limits
@@ -2483,7 +2477,7 @@ class analysis:
                                 debug=self.debug
                             )
                         elif plot_type.lower() == 'gridded_spatial_bias':
-                            splots.make_spatial_bias_gridded(
+                            xrplots.make_spatial_bias_gridded(
                                 p.obj,
                                 column_o=obsvar,
                                 label_o=p.obs,
