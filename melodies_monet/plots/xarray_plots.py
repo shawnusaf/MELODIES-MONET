@@ -315,9 +315,6 @@ def make_taylor(
         dset_forplot = dset
     # import pdb; pdb.set_trace()
 
-    nan_ind = (~np.isnan(dset_forplot[varname_o].values)) & (
-        ~np.isnan(dset_forplot[varname_m].values)
-    )
     # First define items for all plots
     if not debug:
         plt.ioff()
@@ -342,11 +339,8 @@ def make_taylor(
             f = plt.figure(figsize=(12, 10))
         sns.set_style("ticks")
         # plot the line
-        cc = corrcoef(
-            dset_forplot[varname_o].values[nan_ind].flatten(),
-            dset_forplot[varname_m].values[nan_ind].flatten(),
-        )[0, 1]
-        if normalize:
+        cc = xr.corr(dset_forplot[varname_o].stack(tempdim=[...]).dropna(dim='tempdim'),
+            dset_forplot[varanme_m].stack(tempdim=[...]).dropna(dim='tempdim'))
             print(f"Base standard deviation: {refstd: 1.3g}")
             scale_factor = refstd
             dia = td(1, scale=ty_scale, fig=f, rect=111, label=label_o)
@@ -376,10 +370,8 @@ def make_taylor(
     # If plot has been created add to the current axes.
     else:
         # this means that an axis handle already exists and use it to plot another model
-        cc = corrcoef(
-            dset_forplot[varname_o].values[nan_ind].flatten(),
-            dset_forplot[varname_m].values[nan_ind].flatten(),
-        )[0, 1]
+        cc = xr.corr(dset_forplot[varname_o].stack(tempdim=[...]).dropna(dim='tempdim'),
+            dset_forplot[varanme_m].stack(tempdim=[...]).dropna(dim='tempdim'))
         if normalize:
             scale_factor = refstd
             dia.add_sample(
@@ -780,8 +772,7 @@ def make_spatial_bias_gridded(
     varname_m=None,
     label_m=None,
     ylabel=None,
-    vmin=None,
-    vmax=None,
+    vdiff=None,
     nlevels=None,
     proj=None,
     outname="plot",
@@ -792,14 +783,35 @@ def make_spatial_bias_gridded(
     debug=False,
 ):
     """Creates difference plot for satellite and model data.
-    For data in swath format, overplots all differences
-    For data on regular grid, mean difference.
+        For data in swath format, overplots all differences
+        For data on regular grid, mean difference.
 
-    Parameters
-    ----------
-    dset : xr.Dataset
-        Dataset containing the paired data
+        Parameters
+        ----------
+        dset : xr.Dataset
+            model/obs paired data to plot
+        varname_o : str
+            Name of observation variable to plot
+        label_o : str
+            Name of observation variable to use in plot title 
+        varname_m : str
+            Name of model variable to plot
+        label_m : str
+            Name of model variable to use in plot title
+        cblabel : str
+            Title of colorbar axis
+        vdiff : float
+            Min and max value to use on colorbar axis
+        nlevels : float
+            number of levels to break colorbar map into
+        proj : cartopy projection
+            cartopy projection to use in plot
 
+        Returns
+        -------
+        plot
+            satellite spatial bias plot
+        
     """
     if not debug:
         plt.ioff()
@@ -862,21 +874,19 @@ def make_spatial_bias_gridded(
         map_kwargs["crs"] = proj
 
     # First determine colorbar
-    if vmin is None and vmax is None:
-        # vmin = vmodel_mean.quantile(0.01)
-        vmax = np.max(
+    if vdiff is None:
+        vdiff = np.max(
             (
                 np.abs(diff_mod_min_obs.quantile(0.99)),
                 np.abs(diff_mod_min_obs.quantile(0.01)),
             )
         )
-        vmin = -vmax
 
     if nlevels is None:
         nlevels = 21
-    print(vmin, vmax)
-    clevel = np.linspace(vmin, vmax, nlevels)
-    cmap = mpl.cm.get_cmap("bwr", nlevels - 1)
+
+    clevel = np.linspace(-vdiff, vdiff, nlevels)
+    cmap = mpl.cm.get_cmap("RdBu_r", nlevels - 1)
     norm = mpl.colors.BoundaryNorm(clevel, ncolors=cmap.N, clip=False)
 
     # I add extend='both' here because the colorbar is setup to plot the values outside the range
