@@ -340,7 +340,7 @@ def make_taylor(
         sns.set_style("ticks")
         # plot the line
         cc = xr.corr(dset_forplot[varname_o].stack(tempdim=[...]).dropna(dim='tempdim'),
-            dset_forplot[varanme_m].stack(tempdim=[...]).dropna(dim='tempdim'))
+            dset_forplot[varname_m].stack(tempdim=[...]).dropna(dim='tempdim'))
         if normalize:
             print(f"Base standard deviation: {refstd: 1.3g}")
             scale_factor = refstd
@@ -372,7 +372,7 @@ def make_taylor(
     else:
         # this means that an axis handle already exists and use it to plot another model
         cc = xr.corr(dset_forplot[varname_o].stack(tempdim=[...]).dropna(dim='tempdim'),
-            dset_forplot[varanme_m].stack(tempdim=[...]).dropna(dim='tempdim'))
+            dset_forplot[varname_m].stack(tempdim=[...]).dropna(dim='tempdim'))
         if normalize:
             scale_factor = refstd
             dia.add_sample(
