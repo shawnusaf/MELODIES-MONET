@@ -133,6 +133,8 @@ def make_timeseries(
     # set ylabel to column if not specified.
     if ylabel is None:
         ylabel = varname
+        if "units" in dset[varname].attrs:
+            ylabel = f"{ylabel} ({dset[varname].attrs['units']})"
     if label is not None:
         plot_dict["label"] = label
     if (label is None) and (label not in plot_dict.keys()):
@@ -652,6 +654,8 @@ def make_spatial_dist(
     # set ylabel to column if not specified.
     if ylabel is None:
         ylabel = varname
+        if "units" in dset[varname].attrs:
+            ylabel = f"{ylabel} ({dset[varname].attrs['units']})"
 
     # Take the difference for the model output - the sat output
 
@@ -833,6 +837,8 @@ def make_spatial_bias_gridded(
     # set ylabel to column if not specified.
     if ylabel is None:
         ylabel = varname_o
+        if "units" in dset[varname_o].attrs:
+            ylabel = f"{ylabel} ({dset[varname_o].attrs['units']})"
 
     # Take the difference for the model output - the sat output
 
