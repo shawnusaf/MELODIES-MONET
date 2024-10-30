@@ -341,6 +341,7 @@ def make_taylor(
         # plot the line
         cc = xr.corr(dset_forplot[varname_o].stack(tempdim=[...]).dropna(dim='tempdim'),
             dset_forplot[varanme_m].stack(tempdim=[...]).dropna(dim='tempdim'))
+        if normalize:
             print(f"Base standard deviation: {refstd: 1.3g}")
             scale_factor = refstd
             dia = td(1, scale=ty_scale, fig=f, rect=111, label=label_o)
