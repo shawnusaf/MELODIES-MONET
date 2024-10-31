@@ -58,8 +58,6 @@ def time_average(dset, varname=None, period="1D", time_offset=None):
 
 #TODO : Add area weighting in make_timeseries and other similar functions (e.g., boxplots)
 
-#TODO : Add automatic unit label, read from the pairing
-
 def make_timeseries(
     dset,
     varname=None,
