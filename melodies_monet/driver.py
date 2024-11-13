@@ -1450,7 +1450,7 @@ class analysis:
         from .plots import surfplots as splots, savefig
         from .plots import aircraftplots as airplots
         from .plots import xarray_plots as xrplots
-
+        
         # Disable figure count warning
         initial_max_fig = plt.rcParams["figure.max_open_warning"]
         plt.rcParams["figure.max_open_warning"] = 0
