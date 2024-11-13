@@ -261,9 +261,7 @@ class observation:
         from .util import time_interval_subset as tsub
         
         try:
-            if self.sat_type == "ideal2d":
-                self.obj = xr.open_dataset(self.file)
-            elif self.sat_type == 'omps_l3':
+            if self.sat_type == 'omps_l3':
                 print('Reading OMPS L3')
                 self.obj = mio.sat._omps_l3_mm.open_dataset(self.file)
             elif self.sat_type == 'omps_nm':
@@ -1395,21 +1393,6 @@ class analysis:
                         label = '{}_{}'.format(p.obs,p.model)
                         self.paired[label] = p
 
-                    elif obs.sat_type == 'ideal2d':
-                        obs_dat = obs.obj
-                        mod_dat = mod.obj
-                        paired_obsgrid = xr.merge([obs_dat,mod_dat])
-                        #paired_obsgrid = paired_obsgrid.rename({'lat':'latitude','lon':'longitude'})
-                        
-                        p = pair()
-                        p.type = obs.obs_type
-                        p.obs = obs.label
-                        p.model = mod.label
-                        p.model_vars = keys
-                        p.obs_vars = obs_vars
-                        p.obj = paired_obsgrid
-                        label = f'{p.obs}_{p.model}'
-                        self.paired[label] = p
                     elif obs.sat_type == 'mopitt_l3':
                         from .util import satellite_utilities as sutil
                         if mod.apply_ak: 
