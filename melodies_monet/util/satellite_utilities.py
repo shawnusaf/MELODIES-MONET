@@ -78,7 +78,7 @@ def mopitt_l3_pairing(model_data,obs_data,co_ppbv_varname):
         raise
     # initialize regridder for horizontal interpolation 
     # from model grid to MOPITT grid
-    grid_adjust = xe.Regridder(model_obstime[['latitude','longitude']],obs_data[['lat','lon']],'bilinear')
+    grid_adjust = xe.Regridder(model_obstime[['latitude','longitude']],obs_data[['lat','lon']],'bilinear',periodic=True)
     co_model_regrid = grid_adjust(model_obstime[co_ppbv_varname])
     pressure_model_regrid = grid_adjust(model_obstime['pres_pa_mid']/100.)
     

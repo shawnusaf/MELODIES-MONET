@@ -2442,6 +2442,8 @@ class analysis:
                                 debug=self.debug
                             )
                         elif plot_type.lower() == 'gridded_spatial_bias':
+                            import cartopy.crs as ccrs
+                            viewproj = eval(grp_dict.get('projection','ccrs.PlateCarree()'))
                             xrplots.make_spatial_bias_gridded(
                                 p.obj,
                                 varname_o=obsvar,
@@ -2450,6 +2452,7 @@ class analysis:
                                 label_m=p.model,
                                 ylabel=use_ylabel,
                                 #vdiff=vdiff,
+                                proj=viewproj,
                                 outname=outname,
                                 domain_type=domain_type,
                                 domain_name=domain_name,
@@ -2489,6 +2492,25 @@ class analysis:
                                 del (fig_dict, plot_dict, text_dict, obs_dict, obs_plot_dict) #Clear info for next plot.
                             else:
                                 print('Warning: spatial_bias_exceedance plot only works when regulatory=True.')
+                        elif plot_type.lower() == 'spatial_dist':
+                            import cartopy.crs as ccrs
+                            viewproj = eval(grp_dict.get('projection','ccrs.PlateCarree()'))
+                            xrplots.make_spatial_dist(
+                                                pairdf,
+                                                varname=None,
+                                                label=None,
+                                                ylabel=None,
+                                                vmin=None,
+                                                vmax=None,
+                                                nlevels=None,
+                                                proj=viewproj,
+                                                outname="plot",
+                                                domain_type=None,
+                                                domain_name=None,
+                                                fig_dict=None,
+                                                text_dict=None,
+                                                debug=False,
+                                                )
                         # JianHe: need updates to include regulatory option for overlay plots
                         elif plot_type.lower() == 'spatial_overlay':
                             if set_yaxis == True:

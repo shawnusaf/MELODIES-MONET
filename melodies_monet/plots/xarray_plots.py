@@ -875,10 +875,10 @@ def make_spatial_bias_gridded(
 
     # Map the model output first.
     cbar_kwargs = dict(aspect=15, shrink=0.8)
-
+    print(proj)
     # Add options that this could be included in the fig_kwargs in yaml file too.
     if "extent" not in map_kwargs:
-        map_kwargs["extent"] = [lonmin, lonmax, latmin, latmax]
+        map_kwargs["extent"] = (lonmin, lonmax, latmin, latmax)
     if "crs" not in map_kwargs:
         map_kwargs["crs"] = proj
 
@@ -906,7 +906,7 @@ def make_spatial_bias_gridded(
     )
     # draw scatter plot of model and satellite differences
     c = ax.axes.scatter(
-        dset.longitude, dset.latitude, c=diff_mod_min_obs, cmap=cmap, s=2, norm=norm
+        dset.longitude, dset.latitude, c=diff_mod_min_obs, cmap=cmap, s=2, norm=norm,transform=ccrs.PlateCarree()
     )
     plt.gcf().canvas.draw()
     plt.tight_layout(pad=0)
