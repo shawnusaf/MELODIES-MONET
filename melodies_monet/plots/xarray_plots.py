@@ -609,7 +609,6 @@ def make_boxplot(
         outname + ".png",
         #    loc=4,
         logo_height=100,
-        decorate=True,
         bbox_inches="tight",
         dpi=200,
     )
@@ -767,7 +766,6 @@ def make_spatial_dist(
         outname + ".png",
         #    loc=4,
         logo_height=100,
-        decorate=True,
         bbox_inches="tight",
         dpi=150,
     )
@@ -955,7 +953,6 @@ def make_spatial_bias_gridded(
         outname + ".png",
         loc=4,
         logo_height=100,
-        decorate=True,
         bbox_inches="tight",
         dpi=150,
     )
