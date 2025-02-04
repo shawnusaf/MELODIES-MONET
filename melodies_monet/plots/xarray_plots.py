@@ -23,6 +23,10 @@ from numpy import corrcoef
 
 from ..plots import savefig
 
+# TODO:: Add projection support to maps, as optional arguments for the user
+
+# TODO : Add area weighting in make_timeseries and other similar functions (e.g., boxplots)
+
 plt.set_loglevel(level="warning")
 logging.getLogger("PIL").setLevel(logging.WARNING)
 
@@ -53,11 +57,6 @@ def time_average(dset, varname=None, period="1D", time_offset=None):
     daily = dset[varname].resample(time=period, offset=time_offset).mean()
 
     return daily
-
-
-# TODO:: Add projection support to maps, as optional arguments for the user
-
-# TODO : Add area weighting in make_timeseries and other similar functions (e.g., boxplots)
 
 
 def make_timeseries(
