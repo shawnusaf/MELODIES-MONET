@@ -7,6 +7,7 @@
 
 import logging
 
+import warnings
 import cartopy.crs as ccrs
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -21,6 +22,10 @@ from monet.util.tools import get_giorgi_region_bounds as get_giorgi_bounds
 from numpy import corrcoef
 
 from ..plots import savefig
+
+# TODO:: Add projection support to maps, as optional arguments for the user
+
+# TODO : Add area weighting in make_timeseries and other similar functions (e.g., boxplots)
 
 plt.set_loglevel(level="warning")
 logging.getLogger("PIL").setLevel(logging.WARNING)
@@ -54,11 +59,6 @@ def time_average(dset, varname=None, period="1D", time_offset=None):
     return daily
 
 
-# TODO:: Add projection support to maps, as optional arguments for the user
-
-# TODO : Add area weighting in make_timeseries and other similar functions (e.g., boxplots)
-
-
 def make_timeseries(
     dset,
     varname=None,
@@ -73,7 +73,6 @@ def make_timeseries(
     plot_dict=None,
     fig_dict=None,
     text_dict=None,
-    diurnal_cycle=False,
     debug=False,
 ):
     """Creates timeseries plot.
@@ -1090,32 +1089,132 @@ def make_multi_boxplot(
     savefig(outname + ".png", loc=4, logo_height=100)
 
 
-def make_diurnal_cycle(dset, time_offset=0, **kwargs):
+def make_diurnal_cycle(dset, varname, ax=None, **kwargs):
     """Calculates diurnal cycle for region and does the timeseries
 
     Parameters
     ----------
-    dset: xr.Dataset
+    dset : xr.Dataset
         Dataset with paired data
-    time_offset: int | float
+    time_offset : int | float
         Offset (in hours) to apply to the diurnal cycle
-    kwargs: dict
-        Arguments to pass to make_timeseries
+    ax : ax
+        matplotlib ax from previous occurrence so can overlay obs and
+        model results on the same plot
+    **kwargs
+        Other arguments to pass to the diurnal cycle plot.
+        Optional arguments are:
+        time_offset : int | float
+            Time offset in hours. E. g., if you are at UTC-7, and wish
+            to have the plot at local time, do time_offset=-7.
+            Default = 0.
+        ylabel : str
+            Title of y-axis
+            Default = varname
+        vmin : real number
+            Min value to use on y-axis
+        vmax : real number
+            Max value to use on y-axis
+        domain_type : str
+            Domain type specified in input yaml file
+        domain_name : str
+            Domain name specified in input yaml file
+        plot_dict : dictionary
+            Dictionary containing information about plotting for
+            each pair (e.g., color, linestyle, markerstyle)
+        fig_dict : dictionary
+            Dictionary containing information about figure
+        text_dict : dictionary
+            Dictionary containing information about text
+        range_shading : str
+            Whether to shade the range obtained for each hour.
+            options: "no", "total", "std", "pct:number".
+            If "no", no range shading if performed.
+            if "total", the total range obtained is shaded.
+            If "std", the standard deviation is shaded.
+            if "pct:number", then the percentile chosen is shaded
+            (e. g., "pct:98")
+        debug : boolean
+            Whether to plot interactively (True) or not (False). Flag
+            for submitting jobs to supercomputer turn off interactive
+            mode.
 
     Returns
     -------
     ax
-        matplotlib ax such that driver.py can iterate to overlay multiple models on the
-        same plot
+        matplotlib ax such that driver.py can iterate to overlay
+        multiple models on the same plot
     """
     dset_copy = dset.copy()
-    dset_copy["time"] = dset_copy["time"] + np.timedelta64(time_offset, 'h')
+    time_offset = kwargs.get("time_offset", 0)
+    dset_copy["time"] = dset_copy["time"] + np.timedelta64(time_offset, "h")
 
-    dset_diurnal = dset_copy.groupby("time.hour").mean(skipna=True)
-    dset_diurnal = dset_diurnal.rename({'hour': 'time'})
-    ax = make_timeseries(dset_diurnal, **kwargs)
-    print(kwargs)
-    ax.set_xlabel("Hour of the day")
+    dset_copy = dset_copy.mean(dim=["x", "y"])
+    dset_diurnal_group = dset_copy.groupby("time.hour")
+    dset_diurnal = dset_diurnal_group.median()
+
+    # Set some defaults
+    text_kwargs = {"fontsize": 14}
+    style_dict = {"linestyle": "-", "marker": "*", "linewidth": "1.2", "markersize": "6.0"}
+    if ax is None:
+        style_dict["color"] = "k"
+        fig_dict = kwargs.get("fig_dict", {"figsize": (10, 6)})
+        f, ax = plt.subplots(**fig_dict)
+
+    if "text_dict" in kwargs:
+        text_kwargs = {**text_kwargs, **kwargs["text_dict"]}
+
+    ylabel = kwargs.get("ylabel", varname)
+    if "units" in kwargs:
+        ylabel = f"{ylabel} ({kwargs['units']})"
+    elif "units" in dset[varname].attrs:
+        ylabel = f"{ylabel} ({dset[varname].attrs['units']})"
+
+    label = kwargs.get("label", None)
+    p = ax.plot(
+        dset_diurnal["hour"],
+        dset_diurnal[varname],
+        label=label,
+        **{**style_dict, **kwargs["plot_dict"]},
+    )
+    ax.set_xlabel(kwargs.get("xlabel", "hour"), **text_kwargs)
+    ax.set_ylabel(ylabel, **text_kwargs)
+    ax.legend(fontsize=text_kwargs["fontsize"] * 0.8)
+
+    if "range_shading" in kwargs:
+        range_shading = kwargs["range_shading"]
+        if range_shading == "no":
+            pass
+        elif (range_shading not in ["total", "std", "IQR"]) and ("pct:" not in range_shading):
+            warnings.warn(
+                f"range_shading is {range_shading}."
+                + "Should be in ['no', 'total', 'std', 'IQR'] nor 'pct:'. Ignoring."
+            )
+        else:
+            if range_shading == "total":
+                range_max = dset_diurnal_group.max()[varname]
+                range_min = dset_diurnal_group.min()[varname]
+            elif range_shading == "std":
+                std = dset_diurnal_group.std()[varname]
+                range_max = dset_diurnal[varname] + std
+                range_min = dset_diurnal[varname] - std
+            elif range_shading == "IQR":
+                range_max = dset_diurnal_group.quantile(q=0.75)[varname]
+                range_min = dset_diurnal_group.quantile(q=0.25)[varname]
+            elif "pct:" in range_shading:
+                quantile = float(range_shading[4:]) / 100
+                upper_range = quantile + (1 - quantile) / 2
+                lower_range = (1 - quantile) / 2
+                range_max = dset_diurnal_group.quantile(upper_range)[varname]
+                range_min = dset_diurnal_group.quantile(lower_range)[varname]
+            color = p[-1].get_color()
+            ax.fill_between(dset_diurnal["hour"], range_min, range_max, alpha=0.2, color=color)
+    vmax = kwargs.get("vmax", None)
+    vmin = kwargs.get("vmin", None)
+    vmax = float(vmax) if vmax is not None else None
+    vmin = float(vmin) if vmin is not None else None
+    ax.set_ylim(top=vmax, bottom=vmin)
+    ax.set_title(f"{kwargs.get('domain_name', None)}", fontsize=text_kwargs["fontsize"])
     return ax
 
 
