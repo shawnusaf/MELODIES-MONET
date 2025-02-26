@@ -1853,7 +1853,28 @@ class analysis:
                                 savefig(outname + '.png', logo_height=150)
 
                                 del (ax, fig_dict, plot_dict, text_dict, obs_dict, obs_plot_dict)  # Clear axis for next plot.
-                                
+                        elif plot_type.lower() == 'zm_diff_timeseries':
+                            if 'vdiff_plot' in obs_plot_dict.keys():
+                                vdiff = obs_plot_dict['vdiff_plot']
+                            else:
+                                print('Warning: vdiff_plot not specified for ' + obsvar + ', so default used.')
+                                vdiff = None
+                            outname = f"{outname}.{p_label}"
+                            xrplots.make_zonal_mean_difference_timeseries(
+                                pairdf,
+                                varname_o=obsvar,
+                                label_o=p.obs,
+                                varname_m=modvar,
+                                label_m=p.model,
+                                cblabel=use_ylabel,
+                                vdiff=vdiff,
+                                #nlevels=None,
+                                plot_dict=plot_dict,
+                                fig_dict=fig_dict,
+                                text_dict=text_dict,
+                                outname=outname,
+                                debug=self.debug,   
+                            )
                         elif plot_type.lower() == 'curtain':
                             # Set cmin and cmax from obs_plot_dict for colorbar limits
                             if set_yaxis:
@@ -2057,9 +2078,6 @@ class analysis:
                             if p_index == len(pair_labels) - 1:
                                 savefig(outname + '.png', logo_height=150)
                                 del (ax, fig_dict, plot_dict, text_dict, obs_dict, obs_plot_dict) # Clear axis for next plot.
-
-                        
-
                         
                         elif plot_type.lower() == 'violin':
                             if set_yaxis:

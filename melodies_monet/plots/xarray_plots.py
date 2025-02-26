@@ -58,6 +58,128 @@ def time_average(dset, varname=None, period="1D", time_offset=None):
 
     return daily
 
+def make_zonal_mean_difference_timeseries(
+    dset,
+    varname_o=None,
+    label_o=None,
+    varname_m=None,
+    label_m=None,
+    cblabel=None,
+    vdiff=None,
+    nlevels=None,
+    plot_dict=None,
+    fig_dict=None,
+    text_dict=None,
+    outname="plot",
+    debug=False,    
+):
+    """Creates timeseries of zonal mean difference plot.
+
+    Parameters
+    ----------
+    dset : xr.Dataset
+        model/obs pair data to plot
+    varname_o : str
+        Name of observation variable to plot
+    label_o : str
+        Name of observation variable to use in plot title
+    varname_m : str
+        Name of model variable to plot
+    label_m : str
+        Name of model variable to use in plot title
+    cblabel : str
+        Title of colorbar axis
+    vdiff : float
+        Min and max value to use on colorbar axis
+    nlevels : float
+        number of levels to break colorbar map into
+    plot_dict : dictionary
+        Dictionary containing information about plotting for each pair
+        (e.g., color, linestyle, markerstyle)
+    fig_dict : dictionary
+        Dictionary containing information about figure
+    text_dict : dictionary
+        Dictionary containing information about text
+    outname : str
+        file location and name of plot (do not include .png)
+    debug : boolean
+        Whether to plot interactively (True) or not (False). Flag for
+        submitting jobs to supercomputer turn off interactive mode.
+
+    Returns
+    -------
+    ax
+        matplotlib ax
+
+    """
+    
+    if plot_dict is None:
+        plot_dict = {}
+    if not debug:
+        plt.ioff()
+    # First define items for all plots
+    # set default text size
+    def_text = dict(fontsize=14)
+    if text_dict is not None:
+        text_kwargs = {**def_text, **text_dict}
+    else:
+        text_kwargs = def_text
+    # set ylabel to column if not specified.
+    if cblabel is None:
+        cblabel = varname
+        if "units" in dset[varname].attrs:
+            cblabel = f"{cblabel} ({dset[varname].attrs['units']})"
+    diff_mod_min_obs = dset[varname_m] - dset[varname_o]
+
+    # First determine colorbar
+    if vdiff is None:
+        vdiff = np.max(
+            (
+                np.abs(diff_mod_min_obs.quantile(0.99)),
+                np.abs(diff_mod_min_obs.quantile(0.01)),
+            )
+        )
+
+    if nlevels is None:
+        nlevels = 21
+
+    clevel = np.linspace(-vdiff, vdiff, nlevels)
+    cmap = mpl.cm.get_cmap("RdBu_r", nlevels - 1)
+    norm = mpl.colors.BoundaryNorm(clevel, ncolors=cmap.N, clip=False)
+    
+    # create the figure
+    if fig_dict is not None:
+        f, ax = plt.subplots(**fig_dict)
+    else:
+        f, ax = plt.subplots(figsize=(10, 6))
+    diff_mod_min_obs.mean('y').plot.pcolormesh(
+        x='time',
+        y='lat',
+        cmap=cmap,
+        norm=norm,
+        cbar_kwargs={'label':cblabel,'extend':'both'},
+    )
+
+    # Set parameters for all plots
+    ax.set_ylabel('Latitude', fontweight="bold", **text_kwargs)
+    ax.set_xlabel("time", fontweight="bold", **text_kwargs)
+    ax.tick_params(axis="both", length=10.0, direction="inout")
+    ax.tick_params(axis="both", which="minor", length=5.0, direction="out")
+    ax.tick_params(axis="both", which="major", labelsize=text_kwargs["fontsize"] * 0.8)
+    ax.yaxis.get_offset_text().set_fontsize(text_kwargs["fontsize"] * 0.8)
+    ax.xaxis.get_offset_text().set_fontsize(text_kwargs["fontsize"] * 0.8)
+
+    ax.set_title(f'{label_m}-{label_o}', fontweight="bold", **text_kwargs)
+    
+    savefig(
+        outname + ".png",
+        loc=4,
+        logo_height=100,
+        bbox_inches="tight",
+        dpi=150,
+    )
+    return ax
+    
 
 def make_timeseries(
     dset,
@@ -121,6 +243,8 @@ def make_timeseries(
         same plot
 
     """
+    dsplot = dset[varname]
+
     if plot_dict is None:
         plot_dict = {}
     if not debug:
@@ -143,13 +267,12 @@ def make_timeseries(
         plot_dict["label"] = varname
     if vmin is not None and vmax is not None:
         plot_dict["ylim"] = [vmin, vmax]
-
+    if avg_window is not None:
+        dsplot = dsplot.resample(time=avg_window).mean()
     if area_weight:
         weights = np.cos(np.deg2rad(dset.latitude))
         weights.name = "weights"
-        dsplot = dset[varname].weighted(weights)
-    else:
-        dsplot = dset[varname]
+        dsplot = dsplot.weighted(weights)
     
     # Then, if no plot has been created yet, create a plot and plot the obs.
     if ax is None:
@@ -166,18 +289,11 @@ def make_timeseries(
         else:
             f, ax = plt.subplots(figsize=(10, 6))
         # plot the line
-        if avg_window is None:
-            dsplot.mean(dim=("y", "x"), skipna=True).plot.line(
-                x="time",
-                ax=ax,
-                **plot_kwargs,
-            )
-        else:
-            dsplot.resample(time=avg_window).mean().mean(dim=("y", "x")).plot.line(
-                x="time",
-                ax=ax,
-                **plot_kwargs,
-            )
+        dsplot.mean(dim=("y", "x"), skipna=True).plot.line(
+            x="time",
+            ax=ax,
+            **plot_kwargs,
+        )
 
     # If plot has been created add to the current axes.
     else:
@@ -188,18 +304,12 @@ def make_timeseries(
             plot_kwargs = {**mod_dict, **plot_dict}
         else:
             plot_kwargs = obs_dict
-        if avg_window is None:
-            dsplot.mean(dim=("y", "x")).plot.line(
-                x="time",
-                ax=ax,
-                **plot_kwargs,
-            )
-        else:
-            dsplot.resample(time=avg_window).mean().mean(dim=("y", "x")).plot.line(
-                x="time",
-                ax=ax,
-                **plot_kwargs,
-            )
+
+        dsplot.mean(dim=("y", "x")).plot.line(
+            x="time",
+            ax=ax,
+            **plot_kwargs,
+        )
 
     # Set parameters for all plots
     ax.set_ylabel(ylabel, fontweight="bold", **text_kwargs)
