@@ -121,7 +121,6 @@ def make_timeseries(
         same plot
 
     """
-    print(vmin,vmax)
     if plot_dict is None:
         plot_dict = {}
     if not debug:
@@ -167,7 +166,6 @@ def make_timeseries(
         else:
             f, ax = plt.subplots(figsize=(10, 6))
         # plot the line
-        print(plot_kwargs)
         if avg_window is None:
             dsplot.mean(dim=("y", "x"), skipna=True).plot.line(
                 x="time",
@@ -831,10 +829,9 @@ def make_spatial_bias_gridded(
             ylabel = f"{ylabel} ({dset[varname_o].attrs['units']})"
 
     # Take the difference for the model output - the sat output
-
     diff_mod_min_obs = (dset[varname_m] - dset[varname_o]).squeeze()
+    
     # Take mean over time,
-    print(diff_mod_min_obs.dims)
     if 'time' in diff_mod_min_obs.dims:
         print('taking mean')
         diff_mod_min_obs = diff_mod_min_obs.mean("time")
@@ -865,7 +862,7 @@ def make_spatial_bias_gridded(
 
     # Map the model output first.
     cbar_kwargs = dict(aspect=15, shrink=0.8)
-    print(proj)
+
     # Add options that this could be included in the fig_kwargs in yaml file too.
     if "extent" not in map_kwargs:
         map_kwargs["extent"] = (lonmin, lonmax, latmin, latmax)
