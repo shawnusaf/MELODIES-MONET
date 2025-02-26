@@ -65,6 +65,7 @@ def make_timeseries(
     label=None,
     ax=None,
     avg_window="h",
+    area_weight=False,
     ylabel=None,
     vmin=None,
     vmax=None,
@@ -90,6 +91,8 @@ def make_timeseries(
         results on the same plot
     avg_window : rule
         Pandas resampling rule (e.g., 'h', 'D')
+    area_weight : boolean
+        Whether to apply area weighting (True) or not (False).
     ylabel : str
         Title of y-axis
     vmin : real number
@@ -118,6 +121,7 @@ def make_timeseries(
         same plot
 
     """
+    print(vmin,vmax)
     if plot_dict is None:
         plot_dict = {}
     if not debug:
@@ -140,9 +144,14 @@ def make_timeseries(
         plot_dict["label"] = varname
     if vmin is not None and vmax is not None:
         plot_dict["ylim"] = [vmin, vmax]
-    # scale the fontsize for the x and y labels by the text_kwargs
-    plot_dict["fontsize"] = text_kwargs["fontsize"] * 0.8
 
+    if area_weight:
+        weights = np.cos(np.deg2rad(dset.latitude))
+        weights.name = "weights"
+        dsplot = dset[varname].weighted(weights)
+    else:
+        dsplot = dset[varname]
+    
     # Then, if no plot has been created yet, create a plot and plot the obs.
     if ax is None:
         # First define the colors for the observations.
@@ -159,28 +168,17 @@ def make_timeseries(
             f, ax = plt.subplots(figsize=(10, 6))
         # plot the line
         print(plot_kwargs)
-
         if avg_window is None:
-            dset[varname].mean(dim=("y", "x"), skipna=True).plot.line(
+            dsplot.mean(dim=("y", "x"), skipna=True).plot.line(
                 x="time",
                 ax=ax,
-                color=plot_kwargs["color"],
-                linestyle=plot_kwargs["linestyle"],
-                marker=plot_kwargs["marker"],
-                linewidth=plot_kwargs["linewidth"],
-                markersize=plot_kwargs["markersize"],
-                label=plot_kwargs["label"],
+                **plot_kwargs,
             )
         else:
-            dset[varname].resample(time=avg_window).mean().mean(dim=("y", "x")).plot.line(
+            dsplot.resample(time=avg_window).mean().mean(dim=("y", "x")).plot.line(
                 x="time",
                 ax=ax,
-                color=plot_kwargs["color"],
-                linestyle=plot_kwargs["linestyle"],
-                marker=plot_kwargs["marker"],
-                linewidth=plot_kwargs["linewidth"],
-                markersize=plot_kwargs["markersize"],
-                label=plot_kwargs["label"],
+                **plot_kwargs,
             )
 
     # If plot has been created add to the current axes.
@@ -193,26 +191,16 @@ def make_timeseries(
         else:
             plot_kwargs = obs_dict
         if avg_window is None:
-            dset[varname].mean(dim=("y", "x")).plot.line(
+            dsplot.mean(dim=("y", "x")).plot.line(
                 x="time",
                 ax=ax,
-                color=plot_kwargs["color"],
-                linestyle=plot_kwargs["linestyle"],
-                marker=plot_kwargs["marker"],
-                linewidth=plot_kwargs["linewidth"],
-                markersize=plot_kwargs["markersize"],
-                label=plot_kwargs["label"],
+                **plot_kwargs,
             )
         else:
-            dset[varname].resample(time=avg_window).mean().mean(dim=("y", "x")).plot.line(
+            dsplot.resample(time=avg_window).mean().mean(dim=("y", "x")).plot.line(
                 x="time",
                 ax=ax,
-                color=plot_kwargs["color"],
-                linestyle=plot_kwargs["linestyle"],
-                marker=plot_kwargs["marker"],
-                linewidth=plot_kwargs["linewidth"],
-                markersize=plot_kwargs["markersize"],
-                label=plot_kwargs["label"],
+                **plot_kwargs,
             )
 
     # Set parameters for all plots
@@ -230,6 +218,7 @@ def make_timeseries(
     ax.tick_params(axis="both", which="major", labelsize=text_kwargs["fontsize"] * 0.8)
     ax.yaxis.get_offset_text().set_fontsize(text_kwargs["fontsize"] * 0.8)
     ax.xaxis.get_offset_text().set_fontsize(text_kwargs["fontsize"] * 0.8)
+
     if domain_type is not None and domain_name is not None:
         if domain_type == "epa_region":
             ax.set_title("EPA Region " + domain_name, fontweight="bold", **text_kwargs)
@@ -845,7 +834,9 @@ def make_spatial_bias_gridded(
 
     diff_mod_min_obs = (dset[varname_m] - dset[varname_o]).squeeze()
     # Take mean over time,
-    if len(diff_mod_min_obs.dims) == 3:
+    print(diff_mod_min_obs.dims)
+    if 'time' in diff_mod_min_obs.dims:
+        print('taking mean')
         diff_mod_min_obs = diff_mod_min_obs.mean("time")
 
     # Determine the domain

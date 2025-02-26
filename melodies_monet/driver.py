@@ -1474,11 +1474,11 @@ class analysis:
                 interquartile_style = grp_dict.get('data_proc', {}).get('interquartile_style', 'shading')
             else:
                 interquartile_style = None
-
+            
             pair_labels = grp_dict['data']
             # Get the plot type
             plot_type = grp_dict['type']
-
+            
             #read-in special settings for multi-boxplot
             if plot_type == 'multi_boxplot':
                 region_name = grp_dict['region_name'] 
@@ -1758,7 +1758,6 @@ class analysis:
                                 vmin = None
                                 vmax = None
                             # Select time to use as index.
-
                             # 2024-03-01 MEB needs to only apply if pandas. fails for xarray
                             if isinstance(pairdf,pd.core.frame.DataFrame):
                                 pairdf = pairdf.set_index(grp_dict['data_proc']['ts_select_time'])
@@ -1768,7 +1767,11 @@ class analysis:
                                 a_w = grp_dict['data_proc']['ts_avg_window']
                             else:
                                 a_w = None
-
+                            
+                            # 2025-02-25 MEB: Extract area weighting option
+                            # May not work for unstructured grids or for non-rectangular grid cells
+                            area_weight = grp_dict.get('data_proc').get('area_weight',False)
+                            
                             #Steps needed to subset paired df if secondary y-axis (altitude_variable) limits are provided, 
                             #ELSE: make_timeseries from surfaceplots.py plots the whole df by default
                             #Edit below to accomodate 'ground' or 'mobile' where altitude_yax2 is not needed for timeseries
@@ -1806,10 +1809,11 @@ class analysis:
                                     
                                     if operation == "between" and isinstance(value, list) and len(value) == 2:
                                         pairdf = pairdf[pairdf[column].between(vmin_y2, vmax_y2)]
+
                             # link make timeseries to xarray_plots or surfplots, and setup function arguments
                             if use_xrplots:
                                 make_timeseries = xrplots.make_timeseries
-                                plot_params = {'dset': pairdf, 'varname': obsvar}
+                                plot_params = {'dset': pairdf, 'varname': obsvar,'area_weight':area_weight}
                             else: 
                                 make_timeseries = splots.make_timeseries
                                 plot_params = {'df': pairdf, 'df_reg': pairdf_reg, 'column': obsvar}
